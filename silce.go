@@ -1,77 +1,68 @@
 package slice
 
 import (
+	"errors"
 	"reflect"
 	"sync"
 )
 
-type Node struct {
-	parma []interface{}
-	next  *Node
-}
+var (
+	ErrTypeDismatch = errors.New("type of the variable is difference")
+	ErrEmpty        = errors.New("the slice is empty")
+)
 
 type Slice struct {
-	Data  []interface{}
-	First *Node
-	Last  *Node
-	size  int
+	Data []interface{}
+	size int
 	sync.RWMutex
 }
 
-func (e *Slice) InitQueue() *Slice {
+func (e *Slice) InitSlice() *Slice {
 	q := new(Slice)
-	q.First = nil
-	q.Last = nil
+	q.Data = nil
 	q.size = 0
 	return q
 }
 
-func (e *Slice) PushHead(parma []interface{}) {
-	n := new(Node)
-	n.parma = parma
-	e.RLock()
-	defer e.RUnlock()
-	if e.First == nil {
-		e.First = n
-		e.Last = n
-		n.next = nil
+//插入和检测数据类型
+func (e *Slice) PushHeadAndDoFilter(parma []interface{}) error {
+	if e.Data == nil {
+		e.Data = append(e.Data, 0)
+		index := 2
+		copy(e.Data[index+1:], e.Data[index:])
+		e.Data[index] = parma
 	} else {
-		n.next = e.First
-		e.First = n
-	}
-	e.size++
-}
-
-func (e *Slice) Pop() {
-	e.RLock()
-	defer e.RUnlock()
-	f := e.First
-	if f == nil {
-		return
-	} else if f.next == nil {
-		e.First = nil
-	} else {
-		e.First = f.next
-	}
-	e.size--
-}
-
-func (e *Slice) InjectFilter(parmaNext []interface{}) interface{} {
-	if e.First == nil {
-		return "the first node is empty"
-	} else {
-		fp := e.First.parma
-		e.Lock()
-		defer e.Unlock()
-		if reflect.TypeOf(fp) == reflect.TypeOf(parmaNext) {
-			e.PushHead(parmaNext)
+		DataTypeIn := reflect.TypeOf(e.Data[0:])
+		DataTypeOut := reflect.TypeOf(parma)
+		if DataTypeIn == DataTypeOut {
+			e.Data = append(e.Data, 0)
+			index := 2
+			copy(e.Data[index+1:], e.Data[index:])
+			e.Data[index] = parma
+		} else {
+			return ErrTypeDismatch
 		}
 	}
-	return e
+	e.size++
+	return nil
 }
 
-func (e *Slice) Top() *Node {
-	return e.First
+func (e *Slice) Pop() error {
+
+	if e.Data == nil {
+		return ErrEmpty
+	} else {
+		e.RLock()
+		defer e.RUnlock()
+		e.Data = append(e.Data[:0], e.Data[1:]...)
+		e.Data = e.Data[:len(e.Data)-1]
+	}
+	e.size--
+	return nil
+}
+
+func (e *Slice) Top() interface{} {
+	return e.Data[0:]
 }
 
 func (e *Slice) Length() int {
